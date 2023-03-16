@@ -11,20 +11,58 @@ The **MAPLE API** is located at *api/dcp_maple.h*, whereas the *api/dcp_shared_m
 
 The *tests* folder contains the benchmarks in subfolders and four other programs to test MAPLE features. Note that MAPLE can also perform basic DMA as shown in dma.c
 
+## Dependencies
+OS: Ubuntu 16.04 LTS tested
+
+Install Verilator v4.014
+    
+    # Prerequisites:
+    #sudo apt-get install git perl python3 make autoconf g++ flex bison ccache
+    #sudo apt-get install libgoogle-perftools-dev numactl perl-doc
+    #sudo apt-get install libfl2  # Ubuntu only (ignore if gives error)
+    #sudo apt-get install libfl-dev  # Ubuntu only (ignore if gives error)
+    #sudo apt-get install zlibc zlib1g zlib1g-dev  # Ubuntu only (ignore if gives error)
+
+    git clone https://github.com/verilator/verilator   # Only first time
+
+    # Every time you need to build:
+    unsetenv VERILATOR_ROOT  # For csh; ignore error if on bash
+    unset VERILATOR_ROOT  # For bash
+    cd verilator
+    git pull         # Make sure git repository is up-to-date
+    git tag          # See what versions exist
+    git checkout v4.014  # Switch to specified release version
+
+    autoconf         # Create ./configure script
+    ./configure      # Configure and create Makefile
+    make -j `nproc`  # Build Verilator itself (if error, try just 'make')
+    sudo make install
+    
+Install RISCV Toolchain
+    
+    # Prerequisites:
+    #sudo apt-get install autoconf automake autotools-dev curl python3 libmpc-dev libmpfr-dev libgmp-dev gawk build-essential bison flex texinfo gperf libtool patchutils bc zlib1g-dev libexpat-dev ninja-build
+    
+    git clone https://github.com/riscv/riscv-gnu-toolchain
+    
+    # Install with multilib
+    ./configure --prefix=/opt/riscv --enable-multilib
+    make
+    
+
 ## Installation
 
-    git clone git@github.com:PrincetonUniversity/openpiton.git
+    git clone git@github.com:leohanxc/openpiton.git
     cd openpiton
     git checkout openpiton-maple
-    git clone git@github.com:PrincetonUniversity/maple.git
     source piton/ariane_setup.sh 
     source piton/ariane_build_tools.sh
 
 ### Building RTL
-We are now going to build a basic prototype of 3 tiles (2 Arianes and 1 MAPLE tile in between)
+We are now going to build a basic prototype of 3 tiles (2 Arianes and 1 MAPLE tile in between) with Verilator
 
     cd build
-    sims -sys=manycore -ariane -decoupling -vcs_build -x_tiles=3 -y_tiles=1 -config_rtl=MINIMAL_MONITORING
+    sims -sys=manycore -ariane -decoupling -vlt_build -x_tiles=3 -y_tiles=1 -config_rtl=MINIMAL_MONITORING
 
 ### Running basic test
     cd $PITON_ROOT/maple
