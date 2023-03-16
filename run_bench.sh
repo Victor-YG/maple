@@ -16,7 +16,7 @@ print="" #"-gcc_args=-DPRI=1"
 ##6 SIZE dataset (1:Tiny, 2:SMALL 3:BIG)
 ##7 MODE 1:LIMA Loading from DRAM; 2:LIMA Loading from LLC; 3:LIMA Prefetching into LLC; 4:Software Prefetching 
 run(){
-    sims -sys=manycore -ariane -decoupling -vcs_run $1_$2.c -x_tiles=$3 -y_tiles=1 -finish_mask=$mask -rtl_timeout=10000000 -asm_diag_root=../maple -gcc_args=-DBARE_METAL -gcc_args=-DNUM_A=$4 -gcc_args=-DNUM_E=$5 -gcc_args=-DSIZE=$6 -gcc_args=-DMODE=$7 $print
+    sims -sys=manycore -ariane -decoupling -vlt_run $1_$2.c -x_tiles=$3 -y_tiles=1 -finish_mask=$mask -rtl_timeout=10000000 -asm_diag_root=../maple -gcc_args=-DBARE_METAL -gcc_args=-DNUM_A=$4 -gcc_args=-DNUM_E=$5 -gcc_args=-DSIZE=$6 -gcc_args=-DMODE=$7 $print
     cp fake_uart.log res/$1_$2_N$4_D$6.txt
     cp sims.log res/$1_$2_N$4_D$6_sims.txt
 }
