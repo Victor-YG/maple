@@ -39,8 +39,8 @@ void _kernel_(uint32_t access_id, uint32_t core_num){
     uint32_t exec_id;
     uint32_t access_row;
     uint32_t execute_row;
-    uint32_t exec_fifo = 0; 
-    uint32_t access_fifo = 0;
+    uint32_t exec_fifo; 
+    uint32_t access_fifo;
     uint32_t k_access;
     uint32_t k_execute;
     uint32_t access_ipr = 0;
@@ -54,10 +54,13 @@ void _kernel_(uint32_t access_id, uint32_t core_num){
 
     exec_fifo = exec_id;
     access_fifo = access_id;
+
     // Setup FIFOs
     dec_open_producer(access_id);
     dec_set_base64(access_id,x);
     dec_open_consumer(exec_id);
+
+    LK;printf("started kernel, access_id: access_id: %d, exec_id: %d\n", access_id, exec_id);ULK;
 
     // ACCESS
     access_row = 0;
@@ -160,6 +163,11 @@ continue_execute:
         goto done;
     } else {
         // switch to access
+        if (access_ipr) {
+            goto continue_access;
+        } else {
+            goto access;
+        }
     }
 
 done:
