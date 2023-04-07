@@ -35,16 +35,12 @@
 // If we have same amount of A and E, FIFO count is NUM_A 
 #define NUM NUM_A
 
-atomic_int global_access_row[NUM];
-atomic_int global_execute_row[NUM];
-
 // <TODO> add one fifo per row
 
 void _kernel_(uint32_t access_id, uint32_t core_num){
     uint32_t exec_id;
-    uint32_t tile_id;
-    uint32_t local_access_row;
-    uint32_t local_execute_row;
+    uint32_t access_row;
+    uint32_t execute_row;
     uint32_t exec_fifo = 0; // <fix> make compatible with multiple queues per tile
     uint32_t access_fifo = 0; // <fix> make compatible with multiple queues per tile
     uint32_t k_access;
@@ -66,20 +62,19 @@ void _kernel_(uint32_t access_id, uint32_t core_num){
     dec_open_consumer(exec_id);
 
     // ACCESS
+    access_row = 0;
 access:
-    while (local_access_row < (R - 1)) {
-        local_access_row = atomic_fetch_add(&global_access_row[access_id], 1);
-        if (local_access_row >= R) {
-            break;
-        }
+    for (; access_row < R; access_row++) {
         access_ipr = 1;
         #ifdef PRI
         printf("P\n");
         #endif
 
-        int end = ptr[local_access_row+1];
+        LK;printf("access_id: %d, access_row: %d\n", access_id, access_row);ULK;
+
+        int end = ptr[access_row+1];
         int endm1 = end-1;
-        k_access = ptr[local_access_row];
+        k_access = ptr[access_row];
 
 continue_access:
         for (; k_access < end; k_access++){
@@ -94,6 +89,7 @@ continue_access:
             #endif
             if (fifo_full(access_fifo)) {
                 // switch into execute
+                LK;printf("access_id: %d -> exec_id: %d\n", access_id, exec_id);ULK;
                 if (execute_ipr) {
                     goto continue_execute;
                 } else {
@@ -110,7 +106,7 @@ continue_access:
         access_ipr = 0;
     }
 
-    if (local_execute_row >= R) {
+    if (execute_row >= R) {
         goto done;
     } else {
         // switch to execute
@@ -122,19 +118,19 @@ continue_access:
     }
 
     //COMPUTE
+    execute_row = 0;
 execute:
-    while(local_execute_row < (R - 1)) {
-        local_execute_row = atomic_fetch_add(&global_execute_row[exec_id], 1);
-        if (local_execute_row >= R) {
-            break;
-        }
+    for(; execute_row < R; execute_row++) {
         execute_ipr = 1;
+
+        LK;printf("exec_id: %d, exec_row: %d\n", exec_id, exec_row);ULK;
+
         #ifdef PRI
         printf("C\n");
         #endif
         uint64_t yi0 = 0;
-        uint32_t start = ptr[local_execute_row];
-        uint32_t end = ptr[local_execute_row+1];
+        uint32_t start = ptr[execute_row];
+        uint32_t end = ptr[execute_row+1];
         uint64_t dat;
         k_execute = start;
 
@@ -145,6 +141,7 @@ continue_execute:
             #endif
             if (fifo_empty(exec_fifo)) {
                 // switch into access
+                LK;printf("exec_id: %d -> access_id: %d\n", exec_id, access_id);ULK;
                 if (access_ipr) {
                     goto continue_access;
                 } else {
@@ -156,12 +153,12 @@ continue_execute:
             yi0 += val[k_execute]*dat;
         }
         #ifdef RES
-        if (yi0 != verify_data[local_execute_row]) {LK;printf("M%d-%d\n",local_execute_row,ptr[local_execute_row]); ULK; return;}
+        if (yi0 != verify_data[execute_row]) {LK;printf("M%d-%d\n",execute_row,ptr[execute_row]); ULK; return;}
         #endif
         execute_ipr = 0;
     }
 
-    if (local_access_row >= R) {
+    if (access_row >= R) {
         goto done;
     } else {
         // switch to access
