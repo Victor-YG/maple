@@ -60,7 +60,7 @@ void _kernel_(uint32_t access_id, uint32_t core_num){
     dec_set_base64(access_id,x);
     dec_open_consumer(exec_id);
 
-    LK;printf("started kernel, access_id: access_id: %d, exec_id: %d\n", access_id, exec_id);ULK;
+    LK;printf("started kernel, access_id: %d, exec_id: %d\n", access_id, exec_id);ULK;
 
     // ACCESS
     access_row = 0;
@@ -88,8 +88,11 @@ continue_access:
             #ifdef PRI
             printf("D\n");
             #endif
-            if (fifo_full(access_fifo)) {
+            uint64_t full = fifo_full(access_fifo);
+            LK;printf("access_id: %d, access_row: %d, k_access: %d, fifo_full: %ld\n", access_id, access_row, k_access, full);ULK;
+            if (full) {
                 // switch into execute
+                
                 LK;printf("access_id: %d -> exec_id: %d\n", access_id, exec_id);ULK;
                 if (execute_ipr) {
                     goto continue_execute;
@@ -140,7 +143,9 @@ continue_execute:
             #ifdef PRI
             printf("S\n");
             #endif
-            if (fifo_empty(exec_fifo)) {
+            uint64_t empty = fifo_empty(exec_fifo);
+            LK;printf("execute_id: %d, execute_row: %d, k_execute: %d, fifo_empty: %ld\n", execute_id, execute_row, k_execute, empty);ULK;
+            if (empty) {
                 // switch into access
                 LK;printf("exec_id: %d -> access_id: %d\n", exec_id, access_id);ULK;
                 if (access_ipr) {
