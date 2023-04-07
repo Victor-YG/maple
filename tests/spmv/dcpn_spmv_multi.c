@@ -35,14 +35,12 @@
 // If we have same amount of A and E, FIFO count is NUM_A 
 #define NUM NUM_A
 
-// <TODO> add one fifo per row
-
 void _kernel_(uint32_t access_id, uint32_t core_num){
     uint32_t exec_id;
     uint32_t access_row;
     uint32_t execute_row;
-    uint32_t exec_fifo = 0; // <fix> make compatible with multiple queues per tile
-    uint32_t access_fifo = 0; // <fix> make compatible with multiple queues per tile
+    uint32_t exec_fifo = 0; 
+    uint32_t access_fifo = 0;
     uint32_t k_access;
     uint32_t k_execute;
     uint32_t access_ipr = 0;
