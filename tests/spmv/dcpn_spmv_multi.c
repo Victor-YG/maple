@@ -3,7 +3,7 @@
 // Double-precision sparse matrix-vector multiplication benchmark
 //--------------------------------------------------------------------------
 
-// This executes dcpn_spmv twice but with symmetric cores. 
+// This executes dcpn_spmv twice but with symmetric cores.
 // One core is access core for one run and the exec core for anothe run, vice versa.
 
 #include <stdio.h>
@@ -15,11 +15,13 @@
     #include "../maple/tests/data/spmv_data_sq_small.h"
 #elif SIZE == 3
     #include "../maple/tests/data/spmv_data_big.h"
-#elif SIZE == 2 
+#elif SIZE == 2
     #include "../maple/tests/data/spmv_data_small.h"
 #else
     #include "../maple/tests/data/spmv_data_tiny.h"
 #endif
+
+#define PRI
 #define RES 1
 #define FINE 1
 //#define DOUBLEP 1
@@ -31,14 +33,14 @@
     #define NUM_E 1
 #endif
 
-// If we have same amount of A and E, FIFO count is NUM_A 
+// If we have same amount of A and E, FIFO count is NUM_A
 #define NUM NUM_A
 
 void _kernel_(uint32_t access_id, uint32_t core_num){
     uint32_t exec_id;
     uint32_t access_row;
     uint32_t execute_row;
-    uint32_t exec_fifo; 
+    uint32_t exec_fifo;
     uint32_t access_fifo;
     uint32_t k_access;
     uint32_t k_execute;
@@ -54,14 +56,18 @@ void _kernel_(uint32_t access_id, uint32_t core_num){
     exec_fifo = exec_id;
     access_fifo = access_id;
 
+    #ifdef PRI
     printf("started kernel, access_id: %d, exec_id: %d\n", access_id, exec_id);
+    #endif
 
     // Setup FIFOs
     dec_open_producer(access_id);
     dec_set_base64(access_id,x);
     dec_open_consumer(exec_id);
 
+    #ifdef PRI
     printf("opened fifos, access_id: %d, exec_id: %d\n", access_id, exec_id);
+    #endif
 
     // ACCESS
     access_row = 0;
@@ -71,8 +77,9 @@ access:
         #ifdef PRI
         printf("P\n");
         #endif
-
+        #ifdef PRI
         printf("access_id: %d, access_row: %d\n", access_id, access_row);
+        #endif
 
         int end = ptr[access_row+1];
         int endm1 = end-1;
@@ -82,7 +89,7 @@ continue_access:
         for (; k_access < end; k_access++){
             #ifdef DOUBLEP
             if (k!=endm1){
-                dec_load64_asynci(fifo,((uint64_t)idx[k_access]) << 32 | ((uint64_t)idx[k_access+1]) ); 
+                dec_load64_asynci(fifo,((uint64_t)idx[k_access]) << 32 | ((uint64_t)idx[k_access+1]) );
                 k++;
             } else {
             #endif
@@ -90,10 +97,17 @@ continue_access:
             printf("D\n");
             #endif
             uint64_t full = fifo_full(access_fifo);
+
+            #ifdef PRI
             printf("access_id: %d, access_row: %d, k_access: %d, fifo_full: %ld\n", access_id, access_row, k_access, full);
+            #endif
+
             if (full) {
                 // switch into execute
+                #ifdef PRI
                 printf("access_id: %d -> exec_id: %d\n", access_id, exec_id);
+                #endif
+
                 if (execute_ipr) {
                     goto continue_execute;
                 } else {
@@ -111,7 +125,9 @@ continue_access:
     }
 
     // Done accesses
-    printf("access_id: %d, done accesses");
+    #ifdef PRI
+    printf("access_id: %d, done accesses\n");
+    #endif
 
     if (execute_row >= R) {
         goto done;
@@ -130,11 +146,14 @@ execute:
     for(; execute_row < R; execute_row++) {
         execute_ipr = 1;
 
-        printf("exec_id: %d, exec_row: %d\n", exec_id, exec_row);
+        #ifdef PRI
+        printf("exec_id: %d, exec_row: %d\n", exec_id, execute_row);
+        #endif
 
         #ifdef PRI
         printf("C\n");
         #endif
+
         uint64_t yi0 = 0;
         uint32_t start = ptr[execute_row];
         uint32_t end = ptr[execute_row+1];
@@ -147,10 +166,17 @@ continue_execute:
             printf("S\n");
             #endif
             uint64_t empty = fifo_empty(exec_fifo);
-            printf("execute_id: %d, execute_row: %d, k_execute: %d, fifo_empty: %ld\n", execute_id, execute_row, k_execute, empty);
+
+            #ifdef PRI
+            printf("execute_id: %d, execute_row: %d, k_execute: %d, fifo_empty: %ld\n", exec_id, execute_row, k_execute, empty);
+            #endif
+
             if (empty) {
                 // switch into access
-                LK;printf("exec_id: %d -> access_id: %d\n", exec_id, access_id);ULK;
+                #ifdef PRI
+                printf("exec_id: %d -> access_id: %d\n", exec_id, access_id);
+                #endif
+
                 if (access_ipr) {
                     goto continue_access;
                 } else {
@@ -168,7 +194,9 @@ continue_execute:
     }
 
     // Done executes
-    printf("execute_id: %d, done executes");
+    #ifdef PRI
+    printf("execute_id: %d, done executes\n");
+    #endif
 
     if (access_row >= R) {
         goto done;
