@@ -7,7 +7,6 @@
 // One core is access core for one run and the exec core for anothe run, vice versa.
 
 #include <stdio.h>
-#include <stdatomic.h>
 #include "util.h"
 #include "../maple/api/dcp_maple.h"
 #if SIZE == 5
@@ -60,7 +59,7 @@ void _kernel_(uint32_t access_id, uint32_t core_num){
     dec_set_base64(access_id,x);
     dec_open_consumer(exec_id);
 
-    LK;printf("started kernel, access_id: %d, exec_id: %d\n", access_id, exec_id);ULK;
+    printf("started kernel, access_id: %d, exec_id: %d\n", access_id, exec_id);
 
     // ACCESS
     access_row = 0;
@@ -71,7 +70,7 @@ access:
         printf("P\n");
         #endif
 
-        LK;printf("access_id: %d, access_row: %d\n", access_id, access_row);ULK;
+        printf("access_id: %d, access_row: %d\n", access_id, access_row);
 
         int end = ptr[access_row+1];
         int endm1 = end-1;
@@ -89,11 +88,10 @@ continue_access:
             printf("D\n");
             #endif
             uint64_t full = fifo_full(access_fifo);
-            LK;printf("access_id: %d, access_row: %d, k_access: %d, fifo_full: %ld\n", access_id, access_row, k_access, full);ULK;
+            printf("access_id: %d, access_row: %d, k_access: %d, fifo_full: %ld\n", access_id, access_row, k_access, full);
             if (full) {
                 // switch into execute
-                
-                LK;printf("access_id: %d -> exec_id: %d\n", access_id, exec_id);ULK;
+                printf("access_id: %d -> exec_id: %d\n", access_id, exec_id);
                 if (execute_ipr) {
                     goto continue_execute;
                 } else {
@@ -109,6 +107,9 @@ continue_access:
         }
         access_ipr = 0;
     }
+
+    // Done accesses
+    printf("access_id: %d, done accesses");
 
     if (execute_row >= R) {
         goto done;
@@ -127,7 +128,7 @@ execute:
     for(; execute_row < R; execute_row++) {
         execute_ipr = 1;
 
-        LK;printf("exec_id: %d, exec_row: %d\n", exec_id, exec_row);ULK;
+        printf("exec_id: %d, exec_row: %d\n", exec_id, exec_row);
 
         #ifdef PRI
         printf("C\n");
@@ -144,7 +145,7 @@ continue_execute:
             printf("S\n");
             #endif
             uint64_t empty = fifo_empty(exec_fifo);
-            LK;printf("execute_id: %d, execute_row: %d, k_execute: %d, fifo_empty: %ld\n", execute_id, execute_row, k_execute, empty);ULK;
+            printf("execute_id: %d, execute_row: %d, k_execute: %d, fifo_empty: %ld\n", execute_id, execute_row, k_execute, empty);
             if (empty) {
                 // switch into access
                 LK;printf("exec_id: %d -> access_id: %d\n", exec_id, access_id);ULK;
@@ -163,6 +164,9 @@ continue_execute:
         #endif
         execute_ipr = 0;
     }
+
+    // Done executes
+    printf("execute_id: %d, done executes");
 
     if (access_row >= R) {
         goto done;
@@ -192,7 +196,7 @@ int main(int argc, char ** argv) {
     uint32_t id, core_num;
     id = argv[0][0];
     core_num = argv[0][1];
-    if (id == 0) init_tile(NUM);
+    if (id == 0) init_tile(NUM * 2);
     LK;printf("ID: %d of %d\n", id, core_num);ULK
     ATOMIC_OP(amo_cnt, 1, add, w);
     while(core_num != amo_cnt);
