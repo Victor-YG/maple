@@ -54,12 +54,14 @@ void _kernel_(uint32_t access_id, uint32_t core_num){
     exec_fifo = exec_id;
     access_fifo = access_id;
 
+    printf("started kernel, access_id: %d, exec_id: %d\n", access_id, exec_id);
+
     // Setup FIFOs
     dec_open_producer(access_id);
     dec_set_base64(access_id,x);
     dec_open_consumer(exec_id);
 
-    printf("started kernel, access_id: %d, exec_id: %d\n", access_id, exec_id);
+    printf("opened fifos, access_id: %d, exec_id: %d\n", access_id, exec_id);
 
     // ACCESS
     access_row = 0;
