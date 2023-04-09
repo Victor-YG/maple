@@ -38,11 +38,7 @@ static volatile uint32_t row_load = 0;
 static volatile uint32_t row_exec = 0;
 static volatile uint32_t idx_load = 0;
 static volatile uint32_t idx_exec = 0;
-// static volatile uint32_t row_load_mtx = 0;
-// static volatile uint32_t row_exec_mtx = 0;
-// static volatile uint32_t idx_load_mtx = 0;
-// static volatile uint32_t idx_exec_mtx = 0;
-
+static volatile uint32_t occupancy = 0;
 
 void _kernel_(uint32_t id, uint32_t core_num) {
     // LK; printf("core id: %d\n", id); ULK;
@@ -50,8 +46,6 @@ void _kernel_(uint32_t id, uint32_t core_num) {
     uint32_t fifo_exec = 0;
 
     // ACCESS
-    // if(id == 0)
-    // {
     row_load = id;
     row_exec = id;
     dec_open_producer(0);
@@ -60,34 +54,35 @@ void _kernel_(uint32_t id, uint32_t core_num) {
 
 access:
     while (row_load < R) {
-        LK; printf("%d: loading row %d\n", id, row_load); ULK;
+        // LK; printf("%d: loading row %d\n", id, row_load); ULK;
 
         uint32_t start = ptr[row_load];
         uint32_t end   = ptr[row_load + 1];
 
         idx_load = start;
 
+access_continue:
         while(idx_load < end)
         {
             dec_load64_asynci_llc(fifo_load, idx[idx_load]);
             // LK; printf("core %d: loaded x(%d) into fifo %d\n", id, idx[idx_load], fpid[fifo_load]); ULK;
             idx_load += 1;
+            occupancy += 1;
 
-            if (fifo_full(fifo_load)) {
-                LK; printf("%d: A --> E\n", id); ULK;
-                goto execute;
+            // if (fifo_full(fifo_load)) {
+            if (occupancy == 20) {
+                // LK; printf("%d: fifo full %d A --> E\n", id, occupancy); ULK;
+                goto execute_continue;
             }
         }
         row_load += 1;
     }
-    goto exit;
+    goto execute_continue;
 
     //COMPUTE
-    // else if (id == 1)
-    // {
 execute:
     while (row_exec < R) {
-        LK; printf("%d: using row %d\n", id, row_exec); ULK;
+        // LK; printf("%d: using row %d\n", id, row_exec); ULK;
 
         uint64_t yi0 = 0;
         uint32_t start = ptr[row_exec];
@@ -96,15 +91,18 @@ execute:
 
         idx_exec = start;
 
+execute_continue:
         while (idx_exec < end) {
             dat = dec_consume64(fifo_exec); //dat = x[idx[k]];
             yi0 += val[idx_exec] * dat;
             // LK; printf("core %d: used x(%d) = %d from fifo %d\n", id, idx_exec, dat, fcid[fifo_exec]); ULK;
             idx_exec += 1;
+            occupancy -= 1;
 
-            if (fifo_empty(fifo_exec)) {
-                LK; printf("%d: E --> A\n", id); ULK;
-                goto access;
+            // if (fifo_empty(fifo_exec)) {
+            if (occupancy == 2) {
+                // LK; printf("%d: fifo empty %d E --> A\n", id, occupancy); ULK;
+                goto access_continue;
             }
         }
         row_exec += 1;
