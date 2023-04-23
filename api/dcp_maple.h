@@ -410,28 +410,28 @@ uint64_t dec_fifo_stats(uint64_t qid) {
   volatile uint64_t res_stat = *(volatile uint64_t*)(stats_addr | fpid[qid]);
   return res_stat;
 }
-//DEBUG
-uint64_t dec_fifo_debug(uint64_t tile, uint32_t id) {
-  volatile uint64_t res_debug = *(volatile uint64_t*)(debug_addr | base[tile] | id << FIFO);
-  return res_debug;
-}
-// FIFO FULL/EMPTY
-uint64_t fifo_full(uint32_t qid) {
-  uint32_t tile = qid/queues_per_tile;
-  uint64_t s = dec_fifo_debug(tile, qid);
-  uint64_t fifo_full = (s & 0x000000F000000000) >> 36;
-  return fifo_full;
-}
-uint64_t fifo_empty(uint32_t qid) {
-  uint32_t tile = qid/queues_per_tile;
-  uint64_t s = dec_fifo_debug(tile, qid);
-  uint64_t fifo_not_empty = (s & 0x0000000000F00000) >> 20;
-  if (fifo_not_empty) {
-    return 0;
-  } else {
-    return 1;
-  }
-}
+// //DEBUG
+// uint64_t dec_fifo_debug(uint64_t tile, uint32_t id) {
+//   volatile uint64_t res_debug = *(volatile uint64_t*)(debug_addr | base[tile] | id << FIFO);
+//   return res_debug;
+// }
+// // FIFO FULL/EMPTY
+// uint64_t fifo_full(uint32_t qid) {
+//   uint32_t tile = qid/queues_per_tile;
+//   uint64_t s = dec_fifo_debug(tile, qid);
+//   uint64_t fifo_full = (s & 0x000000F000000000) >> 36;
+//   return fifo_full;
+// }
+// uint64_t fifo_empty(uint32_t qid) {
+//   uint32_t tile = qid/queues_per_tile;
+//   uint64_t s = dec_fifo_debug(tile, qid);
+//   uint64_t fifo_not_empty = (s & 0x0000000000F00000) >> 20;
+//   if (fifo_not_empty) {
+//     return 0;
+//   } else {
+//     return 1;
+//   }
+// }
 
 // Produce/Consume
 void dec_produce32(uint64_t qid, uint32_t data) {
