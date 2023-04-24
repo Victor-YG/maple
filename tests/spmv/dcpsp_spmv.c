@@ -193,7 +193,7 @@ void prog0_execute_kernel(uint32_t exec_id, uint32_t threshold) {
                 stop_switching = prog0_access_done;
                 if (!stop_switching) {
                     prog0_consume_cnt += consume_cnt;
-                    // consume_cnt = 0;
+                    consume_cnt = 0;
                     yi0_prog0_e = yi0;
                     i_prog0_e = i;
                     k_prog0_e = k;
@@ -407,7 +407,7 @@ void prog1_access_finish(uint32_t id) {
 }
 
 void prog1_execute_finish(uint32_t exec_id) {
-    dec_close_producer(exec_id);
+    dec_close_consumer(exec_id);
 }
 
 void _kernel_(uint32_t id, uint32_t core_num){
