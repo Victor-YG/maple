@@ -7,7 +7,7 @@
     #include "../maple/tests/data/spmv_data_sq_small.h"
 #elif SIZE == 3
     #include "../maple/tests/data/spmv_data_big.h"
-#elif SIZE == 2 
+#elif SIZE == 2
     #include "../maple/tests/data/spmv_data_small.h"
 #else
     #include "../maple/tests/data/spmv_data_tiny.h"
@@ -29,7 +29,7 @@
     #define NUM (NUM_A * NUM_E)
     #define MAP 1
 #else
-    // If we have same amount of A and E, FIFO count is NUM_A 
+    // If we have same amount of A and E, FIFO count is NUM_A
     #define NUM NUM_A
 #endif
 
@@ -106,16 +106,13 @@ void prog0_access_kernel(uint32_t id, uint32_t threshold) {
         // LK;printf("Producer ID: %d, row: %d, threshold: %d\n", id, i, threshold);ULK;
         #ifdef MAP
         uint32_t fif = i%NUM;
-        #else 
+        #else
         uint32_t fif = id;
-        #endif
-        #ifdef PRI
-        printf("P\n");
         #endif
 
         int end = ptr[i+1];
         int endm1 = end-1;
-        
+
         if (k == 0) {
             k = ptr[i];
         }
@@ -136,13 +133,10 @@ void prog0_access_kernel(uint32_t id, uint32_t threshold) {
             }
             #ifdef DOUBLEP
             if (k!=endm1){
-                dec_load64_asynci(fif,((uint64_t)idx[k]) << 32 | ((uint64_t)idx[k+1]) ); 
+                dec_load64_asynci(fif,((uint64_t)idx[k]) << 32 | ((uint64_t)idx[k+1]) );
                 k++;
             } else {
             #endif
-                #ifdef PRI
-                printf("D\n");
-                #endif
                 dec_load64_asynci_llc(fif,idx[k]);
                 produce_cnt++;
                 //dec_produce64(fif,x[idx[k]]);
@@ -172,18 +166,15 @@ void prog0_execute_kernel(uint32_t exec_id, uint32_t threshold) {
     // LK;printf("prog0_execute, i: %d\n",i);ULK;
     while (i < R){
         // LK;printf("Consumer ID: %d, row: %d\n", exec_id, i);ULK;
-        #ifdef PRI
-        printf("C\n");
-        #endif
         #ifdef MAP
         uint32_t fifo = i%NUM;
-        #else 
+        #else
         uint32_t fifo = exec_id;
         #endif
-        
+
         uint32_t start = ptr[i];
         uint32_t end = ptr[i+1];
-        
+
         if (k == 0) {
             k = start;
         }
@@ -204,16 +195,16 @@ void prog0_execute_kernel(uint32_t exec_id, uint32_t threshold) {
                     // return;
                 }
             }
-            #ifdef PRI
-            printf("S\n");
-            #endif
             dat = dec_consume64(fifo);
             consume_cnt++;
             //dat = x[idx[k]];
             yi0 += val[k]*dat;
         }
         #ifdef RES
-        if (yi0 != verify_data[i]) {LK;printf("M%d-%d\n",i,ptr[i]); ULK; return;}
+        if (yi0 != verify_data[i]) {
+            LK;printf("M%d-%d\n",i,ptr[i]); ULK;
+            return;
+        }
         #endif
         i += (2 * NUM);
         k = 0;
@@ -280,16 +271,13 @@ void prog1_access_kernel(uint32_t id, uint32_t threshold) {
         // LK;printf("Producer ID: %d, row: %d, threshold: %d\n", id, i, produce_threshold);ULK;
         #ifdef MAP
         uint32_t fif = i%NUM;
-        #else 
+        #else
         uint32_t fif = id;
-        #endif
-        #ifdef PRI
-        printf("P\n");
         #endif
 
         int end = ptr[i+1];
         int endm1 = end-1;
-        
+
         if (k == 0) {
             k = ptr[i];
         }
@@ -311,13 +299,10 @@ void prog1_access_kernel(uint32_t id, uint32_t threshold) {
             #ifdef DOUBLEP
             if (k!=endm1){
                 dec_load64_asynci(fif,((uint64_t)idx[k]) << 32 | ((uint64_t)idx[k+1]) );
-                produce_cnt++; 
+                produce_cnt++;
                 k++;
             } else {
             #endif
-                #ifdef PRI
-                printf("D\n");
-                #endif
                 dec_load64_asynci_llc(fif,idx[k]);
                 produce_cnt++;
                 //dec_produce64(fif,x[idx[k]]);
@@ -347,18 +332,15 @@ void prog1_execute_kernel(uint32_t exec_id, uint32_t threshold) {
     // LK;printf("prog1_execute, i: %d\n",i);ULK;
     while (i < R){
         // LK;printf("Consumer ID: %d, row: %d\n", exec_id, i);ULK;
-        #ifdef PRI
-        printf("C\n");
-        #endif
         #ifdef MAP
         uint32_t fifo = i%NUM;
-        #else 
+        #else
         uint32_t fifo = exec_id;
         #endif
-        
+
         uint32_t start = ptr[i];
         uint32_t end = ptr[i+1];
-        
+
         if (k == 0) {
             k = start;
         }
@@ -379,16 +361,16 @@ void prog1_execute_kernel(uint32_t exec_id, uint32_t threshold) {
                     // return;
                 }
             }
-            #ifdef PRI
-            printf("S\n");
-            #endif
             dat = dec_consume64(fifo);
             consume_cnt++;
             //dat = x[idx[k]];
             yi0 += val[k]*dat;
         }
         #ifdef RES
-        if (yi0 != verify_data[i]) {LK;printf("M%d-%d\n",i,ptr[i]); ULK; return;}
+        if (yi0 != verify_data[i]) {
+            LK;printf("M%d-%d\n",i,ptr[i]); ULK;
+            return;
+        }
         #endif
         i += (2 * NUM);
         k = 0;
@@ -419,7 +401,7 @@ void _kernel_(uint32_t id, uint32_t core_num){
         prog0_access_init(id);
         prog0_execute_init(exec_id);
         // LK;printf("core: %d running\n", id);ULK;
-        
+
         // Run
         while(!(prog0_access_done && prog0_execute_done)) {
             int consume_threshold = prog0_produce_cnt - prog0_consume_cnt;
@@ -445,7 +427,7 @@ void _kernel_(uint32_t id, uint32_t core_num){
         prog1_access_init(id);
         prog1_execute_init(exec_id);
         // LK;printf("core: %d running\n", id);ULK;
-        
+
         // Run
         while(!(prog1_access_done && prog1_execute_done)) {
             int consume_threshold = prog1_produce_cnt - prog1_consume_cnt;
@@ -476,7 +458,7 @@ int main(int argc, char ** argv) {
     id = argv[0][0];
     core_num = argv[0][1];
     if (id == 0) init_tile(NUM * 2);
-    LK;printf("ID: %d of %d\n", id, core_num);ULK
+    // LK;printf("ID: %d of %d\n", id, core_num);ULK
     ATOMIC_OP(amo_cnt, 1, add, w);
     while(core_num != amo_cnt);
     _kernel_(id,core_num);
@@ -493,7 +475,7 @@ int main(int argc, char ** argv) {
     #pragma omp parallel
     {
         uint32_t ide = omp_get_thread_num();
-        LK;printf("ID: %d\n", ide);ULK;
+        // LK;printf("ID: %d\n", ide);ULK;
         #pragma omp barrier
         _kernel_(ide, core_num);
     }

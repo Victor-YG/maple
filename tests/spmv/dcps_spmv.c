@@ -70,7 +70,7 @@ access_continue:
             occupancy += 1;
 
             // if (fifo_full(fifo_load)) {
-            if (occupancy == 20) {
+            if (occupancy > 30) {
                 // LK; printf("%d: fifo full %d A --> E\n", id, occupancy); ULK;
                 goto execute_continue;
             }
@@ -125,14 +125,13 @@ int main(int argc, char ** argv) {
     id = argv[0][0];
     core_num = argv[0][1];
     if (id == 0) init_tile(NUM);
-    LK; printf("ID: %d of %d\n", id, core_num); ULK
+    // LK; printf("ID: %d of %d\n", id, core_num); ULK
     ATOMIC_OP(amo_cnt, 1, add, w);
-    // while(core_num != amo_cnt);
-    // if (id == 0)
-    _kernel_(id,core_num);
+    while(core_num != amo_cnt);
+    _kernel_(id, core_num);
     // barrier to make sure all tiles closed their fifos
     ATOMIC_OP(amo_cnt2, 1, add, w);
-    // while(core_num != amo_cnt2);
+    while(core_num != amo_cnt2);
     if (id == 0) print_stats_fifos(NUM);
     return result;
 #else
@@ -145,7 +144,7 @@ int main(int argc, char ** argv) {
     #pragma omp parallel
     {
         uint32_t ide = omp_get_thread_num();
-        LK; printf("ID: %d\n", ide); ULK;
+        // LK; printf("ID: %d\n", ide); ULK;
         #pragma omp barrier
         _kernel_(ide, core_num);
     }

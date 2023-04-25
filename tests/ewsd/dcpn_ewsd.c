@@ -3,7 +3,7 @@
 #include "../maple/api/dcp_maple.h"
 #if SIZE >= 3
     #include "../maple/tests/data/ewsd_data_big.h"
-#elif SIZE == 2 
+#elif SIZE == 2
     #include "../maple/tests/data/ewsd_data_small.h"
 #else
     #include "../maple/tests/data/ewsd_data_tiny.h"
@@ -22,7 +22,7 @@
     #define NUM (NUM_A * NUM_E)
     #define MAP 1
 #else
-    // If we have same amount of A and E, FIFO count is NUM_A 
+    // If we have same amount of A and E, FIFO count is NUM_A
     #define NUM NUM_A
 #endif
 
@@ -58,7 +58,7 @@ void _kernel_(uint32_t id, uint32_t core_num){
         #endif
             #ifdef MAP
             uint32_t fif = i%NUM;
-            #else 
+            #else
             uint32_t fif = id;
             #endif
             #ifdef PRI
@@ -80,7 +80,7 @@ void _kernel_(uint32_t id, uint32_t core_num){
                     dec_load32_async(fif,&M[dense_idx]);
                     //dec_produce32(id,M[dense_idx]);
                 #ifdef DOUBLEP
-                } 
+                }
                 #endif
             }
         }
@@ -96,8 +96,8 @@ void _kernel_(uint32_t id, uint32_t core_num){
         dec_open_consumer(exec_id);
         //COMPUTE
         uint32_t sparse, dense;
-        uint64_t dense2; 
-        
+        uint64_t dense2;
+
         #ifdef FINE
         for (uint32_t i = exec_id; i < shape_0; i+=NUM_E){
         #else

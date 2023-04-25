@@ -12,7 +12,7 @@
     #include "../maple/tests/data/spmv_data_sq_small.h"
 #elif SIZE == 3
     #include "../maple/tests/data/spmv_data_big.h"
-#elif SIZE == 2 
+#elif SIZE == 2
     #include "../maple/tests/data/spmv_data_small.h"
 #else
     #include "../maple/tests/data/spmv_data_tiny.h"
@@ -33,7 +33,7 @@
     #define NUM (NUM_A * NUM_E)
     #define MAP 1
 #else
-    // If we have same amount of A and E, FIFO count is NUM_A 
+    // If we have same amount of A and E, FIFO count is NUM_A
     #define NUM NUM_A
 #endif
 
@@ -56,7 +56,7 @@ void _kernel_(uint32_t id, uint32_t core_num){
         for (int i = id; i < R; i+=NUM_A) {
             #ifdef MAP
             uint32_t fif = i%NUM;
-            #else 
+            #else
             uint32_t fif = id;
             #endif
             #ifdef PRI
@@ -68,7 +68,7 @@ void _kernel_(uint32_t id, uint32_t core_num){
             for (int k=ptr[i]; k < end; k++){
                 #ifdef DOUBLEP
                 if (k!=endm1){
-                    dec_load64_asynci(fif,((uint64_t)idx[k]) << 32 | ((uint64_t)idx[k+1]) ); 
+                    dec_load64_asynci(fif,((uint64_t)idx[k]) << 32 | ((uint64_t)idx[k+1]) );
                     k++;
                 } else {
                 #endif
@@ -104,7 +104,7 @@ void _kernel_(uint32_t id, uint32_t core_num){
             #endif
             #ifdef MAP
             uint32_t fifo = i%NUM;
-            #else 
+            #else
             uint32_t fifo = exec_id;
             #endif
             uint64_t yi0 = 0;
@@ -142,7 +142,7 @@ int main(int argc, char ** argv) {
     id = argv[0][0];
     core_num = argv[0][1];
     if (id == 0) init_tile(NUM);
-    LK;printf("ID: %d of %d\n", id, core_num);ULK
+    // LK;printf("ID: %d of %d\n", id, core_num);ULK
     ATOMIC_OP(amo_cnt, 1, add, w);
     while(core_num != amo_cnt);
     _kernel_(id,core_num);
@@ -160,7 +160,7 @@ int main(int argc, char ** argv) {
     #pragma omp parallel
     {
         uint32_t ide = omp_get_thread_num();
-        LK;printf("ID: %d\n", ide);ULK;
+        // LK;printf("ID: %d\n", ide);ULK;
         #pragma omp barrier
         _kernel_(ide, core_num);
     }
