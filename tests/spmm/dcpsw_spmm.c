@@ -182,7 +182,7 @@ void prog0_access_kernel(uint32_t id, uint32_t threshold) {
     }
 
     prog0_access_done = 1;
-    LK;printf("prog0 access done\n");ULK;
+    // LK;printf("prog0 access done\n");ULK;
     prog0_produce_cnt += produce_cnt;
 }
 
