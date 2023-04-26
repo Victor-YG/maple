@@ -7,9 +7,8 @@
     #include "../maple/tests/data/ewsd_data_small.h"
 #else
     #include "../maple/tests/data/ewsd_data_tiny.h"
+    #define RES 1
 #endif
-// #define RES 1
-#define FIFO_SIZE 32
 
 #ifndef NUM_A
     #define NUM_A 1
@@ -27,10 +26,15 @@
     #define NUM NUM_A
 #endif
 
+#define FIFO_SIZE 64
+
+#define ACCESS 0
+#define EXECUTE 1
+
 //Type of parallelization
 #define FINE 1
-//#define DOUBLEP 1
-//#define DOUBLEC 1
+
+
 
 /***FIFO counters***/
 volatile static uint32_t prog0_produce_cnt = 0;
@@ -64,36 +68,35 @@ volatile static uint8_t prog1_execute_done = 0;
 void prog0_access_init(uint32_t id) {
     dec_open_producer(id);
     i_prog0_a = id;
+    k_prog0_a = 0;
 }
 
 void prog0_execute_init(uint32_t exec_id) {
     dec_open_consumer(exec_id);
     i_prog0_e = exec_id;
+    k_prog0_e = 0;
 }
 
 void prog0_access_kernel(uint32_t id, uint32_t threshold) {
     uint32_t i = i_prog0_a;
     uint32_t k = k_prog0_a;
     uint8_t stop_switching = prog0_execute_done;
-    uint32_t fifo = id;
     uint32_t produce_cnt = 0;
     uint32_t produce_threshold = threshold;
     // LK;printf("prog0_access, i: %d\n", i);ULK;
     uint32_t shape_0 = G_shape[0];
     uint32_t shape_1 = G_shape[1];
 
-    uint32_t dense_idx;
-
-    while (i < shape_0) {
+    for (; i < shape_0; i += (2 * NUM)) {
         uint32_t end = G_indptr[i+1];
-        uint32_t endm1 = end-1;
+        uint32_t start = G_indptr[i];
 
         if (k == 0) {
-            k = G_indptr[i];
+            k = start;
         }
 
-        while (k < end) {
-            if ((produce_cnt >= produce_threshold) && (!stop_switching)) {
+        for (; k < end; k++) {
+            if (((produce_cnt + 1) > produce_threshold) && (!stop_switching)) {
                 stop_switching = prog0_execute_done;
                 if (!stop_switching) {
                     prog0_produce_cnt += produce_cnt;
@@ -101,25 +104,20 @@ void prog0_access_kernel(uint32_t id, uint32_t threshold) {
                     i_prog0_a = i;
                     k_prog0_a = k;
                     produce_threshold = FIFO_SIZE - (prog0_produce_cnt - prog0_consume_cnt);
-                    if (produce_threshold <= (FIFO_SIZE/2)) {
+                    if (produce_threshold < 1) {
                         return;
                     }
                 }
             }
-            dense_idx = i * shape_1 + G_indices[k];
-            dec_load32_async(fifo, &M[dense_idx]);
+            uint32_t dense_idx = i * shape_1 + G_indices[k];
+            dec_load32_async(id, &M[dense_idx]);
             produce_cnt++;
-            k += 1;
         }
-
-        i += (2 * NUM_A);
         k = 0;
     }
 
     // LK;printf("prog0 access done\n");ULK;
     prog0_access_done = 1;
-    i_prog0_a = i;
-    k_prog0_a = 0;
     prog0_produce_cnt += produce_cnt;
 }
 
@@ -127,26 +125,21 @@ void prog0_execute_kernel(uint32_t exec_id, uint32_t threshold) {
     uint32_t i = i_prog0_e;
     uint32_t k = k_prog0_e;
     uint8_t stop_switching = prog0_access_done;
-    uint32_t fifo = exec_id;
     uint32_t consume_cnt = 0;
     uint32_t consume_threshold = threshold;
     // LK;printf("prog0_execute, i: %d\n",i);ULK;
     uint32_t shape_0 = G_shape[0];
-    uint32_t shape_1 = G_shape[1];
 
-    uint32_t sparse, dense;
-    uint64_t dense2;
-
-    while (i < shape_0) {
+    for (; i < shape_0; i += (2 * NUM)) {
         uint32_t end = G_indptr[i+1];
-        uint32_t endm1 = end-1;
+        uint32_t start = G_indptr[i];
 
         if (k == 0) {
-            k = G_indptr[i];
+            k = start;
         }
 
-        while (k < end) {
-            if ((consume_cnt >= consume_threshold) && (!stop_switching)) {
+        for (; k < end; k++) {
+            if (((consume_cnt + 1) > consume_threshold) && (!stop_switching)) {
                 stop_switching = prog0_access_done;
                 if (!stop_switching) {
                     prog0_consume_cnt += consume_cnt;
@@ -154,16 +147,16 @@ void prog0_execute_kernel(uint32_t exec_id, uint32_t threshold) {
                     i_prog0_e = i;
                     k_prog0_e = k;
                     consume_threshold = prog0_produce_cnt - prog0_consume_cnt;
-                    if (consume_threshold <= (FIFO_SIZE / 2)) {
+                    if (consume_threshold < 1) {
                         return;
                     }
                 }
             }
             uint32_t dat = G_data[k];
-            dense = dec_consume32(exec_id);
+            uint32_t dense = dec_consume32(exec_id);
             consume_cnt++;
             result_data[k] = dat * dense;
-            k += 1;
+            result_indices[k] = G_indices[k];
 
             #ifdef RES
             if (result_data2[k] != result_data[k]) {
@@ -172,15 +165,11 @@ void prog0_execute_kernel(uint32_t exec_id, uint32_t threshold) {
             }
             #endif
         }
-
-        i += (2 * NUM);
         k = 0;
     }
 
     prog0_execute_done = 1;
     // LK;printf("prog0 execute done\n");ULK;
-    i_prog0_e = i;
-    k_prog0_e = 0;
     prog0_consume_cnt += consume_cnt;
 }
 
@@ -197,36 +186,35 @@ void prog0_execute_finish(uint32_t exec_id) {
 void prog1_access_init(uint32_t id) {
     dec_open_producer(id);
     i_prog1_a = id;
+    k_prog1_a = 0;
 }
 
 void prog1_execute_init(uint32_t exec_id) {
     dec_open_consumer(exec_id);
     i_prog1_e = exec_id;
+    k_prog1_e = 0;
 }
 
 void prog1_access_kernel(uint32_t id, uint32_t threshold) {
     uint32_t i = i_prog1_a;
     uint32_t k = k_prog1_a;
     uint8_t stop_switching = prog1_execute_done;
-    uint32_t fifo = id;
     uint32_t produce_cnt = 0;
     uint32_t produce_threshold = threshold;
     // LK;printf("prog1_access, i: %d\n", i);ULK;
     uint32_t shape_0 = G_shape[0];
     uint32_t shape_1 = G_shape[1];
 
-    uint32_t dense_idx;
-
-    while (i < shape_0) {
+    for (; i < shape_0; i += (2 * NUM)) {
         uint32_t end = G_indptr[i+1];
-        uint32_t endm1 = end-1;
+        uint32_t start = G_indptr[i];
 
         if (k == 0) {
-            k = G_indptr[i];
+            k = start;
         }
 
-        while (k < end) {
-            if ((produce_cnt >= produce_threshold) && (!stop_switching)) {
+        for (; k < end; k++) {
+            if (((produce_cnt + 1) > produce_threshold) && (!stop_switching)) {
                 stop_switching = prog1_execute_done;
                 if (!stop_switching) {
                     prog1_produce_cnt += produce_cnt;
@@ -234,25 +222,20 @@ void prog1_access_kernel(uint32_t id, uint32_t threshold) {
                     i_prog1_a = i;
                     k_prog1_a = k;
                     produce_threshold = FIFO_SIZE - (prog1_produce_cnt - prog1_consume_cnt);
-                    if (produce_threshold <= (FIFO_SIZE / 2)) {
+                    if (produce_threshold < 1) {
                         return;
                     }
                 }
             }
-            dense_idx = i * shape_1 + G_indices[k];
-            dec_load32_async(fifo, &M[dense_idx]);
+            uint32_t dense_idx = i * shape_1 + G_indices[k];
+            dec_load32_async(id, &M[dense_idx]);
             produce_cnt++;
-            k += 1;
         }
-
-        i += (2 * NUM_A);
         k = 0;
     }
 
     // LK;printf("prog1 access done\n");ULK;
     prog1_access_done = 1;
-    i_prog1_a = i;
-    k_prog1_a = 0;
     prog1_produce_cnt += produce_cnt;
 }
 
@@ -260,26 +243,21 @@ void prog1_execute_kernel(uint32_t exec_id, uint32_t threshold) {
     uint32_t i = i_prog1_e;
     uint32_t k = k_prog1_e;
     uint8_t stop_switching = prog1_access_done;
-    uint32_t fifo = exec_id;
     uint32_t consume_cnt = 0;
     uint32_t consume_threshold = threshold;
     // LK;printf("prog1_execute, i: %d\n",i);ULK;
     uint32_t shape_0 = G_shape[0];
-    uint32_t shape_1 = G_shape[1];
 
-    uint32_t sparse, dense;
-    uint64_t dense2;
-
-    while (i < shape_0) {
+    for (; i < shape_0; i += (2 * NUM)) {
         uint32_t end = G_indptr[i+1];
-        uint32_t endm1 = end-1;
+        uint32_t start = G_indptr[i];
 
         if (k == 0) {
-            k = G_indptr[i];
+            k = start;
         }
 
-        while (k < end) {
-            if ((consume_cnt >= consume_threshold) && (!stop_switching)) {
+        for (; k < end; k++) {
+            if (((consume_cnt + 1) > consume_threshold) && (!stop_switching)) {
                 stop_switching = prog1_access_done;
                 if (!stop_switching) {
                     prog1_consume_cnt += consume_cnt;
@@ -287,16 +265,16 @@ void prog1_execute_kernel(uint32_t exec_id, uint32_t threshold) {
                     i_prog1_e = i;
                     k_prog1_e = k;
                     consume_threshold = prog1_produce_cnt - prog1_consume_cnt;
-                    if (consume_threshold <= (FIFO_SIZE / 2)) {
+                    if (consume_threshold < 1) {
                         return;
                     }
                 }
             }
             uint32_t dat = G_data[k];
-            dense = dec_consume32(exec_id);
+            uint32_t dense = dec_consume32(exec_id);
             consume_cnt++;
             result_data[k] = dat * dense;
-            k += 1;
+            result_indices[k] = G_indices[k];
 
             #ifdef RES
             if (result_data2[k] != result_data[k]) {
@@ -305,15 +283,11 @@ void prog1_execute_kernel(uint32_t exec_id, uint32_t threshold) {
             }
             #endif
         }
-
-        i += (2 * NUM);
         k = 0;
     }
 
     prog1_execute_done = 1;
     // LK;printf("prog1 execute done\n");ULK;
-    i_prog1_e = i;
-    k_prog1_e = 0;
     prog1_consume_cnt += consume_cnt;
 }
 
@@ -329,21 +303,24 @@ void _kernel_(uint32_t id, uint32_t core_num) {
     if (id < NUM_A) {
         /***PROG0 ACCESS and PROG1 EXECUTE*/
         // Init
-        uint32_t exec_id = id;
+        uint32_t exec_id = id + NUM;
         prog0_access_init(id);
         prog0_execute_init(exec_id);
         // LK;printf("core: %d running\n", id);ULK;
 
         // Run
+        uint8_t role = ACCESS;
         while(!(prog0_access_done && prog0_execute_done)) {
             int consume_threshold = prog0_produce_cnt - prog0_consume_cnt;
             int produce_threshold = FIFO_SIZE - (prog0_produce_cnt - prog0_consume_cnt);
-            if ((((consume_threshold > ((FIFO_SIZE * 3)/4))) || prog0_access_done)) {
+            if (((role == EXECUTE) || prog0_access_done) && (!prog0_execute_done)) {
                 // LK;printf("exec: %d\n", exec_id);ULK;
                 prog0_execute_kernel(exec_id, consume_threshold);
+                role = ACCESS;
             } else {
                 // LK;printf("access: %d\n", id);ULK;
                 prog0_access_kernel(id, produce_threshold);
+                role = EXECUTE;
             }
         }
 
@@ -356,21 +333,24 @@ void _kernel_(uint32_t id, uint32_t core_num) {
     else {
         /***PROG1 ACCESS and PROG0 EXECUTE*/
         // Init
-        uint32_t exec_id = id;
+        uint32_t exec_id = id - NUM;
         prog1_access_init(id);
         prog1_execute_init(exec_id);
         // LK;printf("core: %d running\n", id);ULK;
 
         // Run
+        uint8_t role = ACCESS;
         while(!(prog1_access_done && prog1_execute_done)) {
             int consume_threshold = prog1_produce_cnt - prog1_consume_cnt;
             int produce_threshold = FIFO_SIZE - (prog1_produce_cnt - prog1_consume_cnt);
-            if (((consume_threshold > ((FIFO_SIZE * 3)/4)) || prog1_access_done)) {
+            if (((role == EXECUTE) || prog1_access_done) && (!prog1_execute_done)) {
                 // LK;printf("exec: %d\n", exec_id);ULK;
                 prog1_execute_kernel(exec_id, consume_threshold);
+                role = ACCESS;
             } else {
                 // LK;printf("access: %d\n", id);ULK;
                 prog1_access_kernel(id, produce_threshold);
+                role = EXECUTE;
             }
         }
         // LK;printf("core: %d waiting\n", id);ULK;
@@ -405,7 +385,7 @@ int main(int argc, char ** argv) {
     #include <omp.h>
     omp_set_num_threads(core_num);
     touch(M,G_shape[0]*G_shape[1]);
-    init_tile(NUM);
+    init_tile(NUM * 2);
     #pragma omp parallel
     {
         uint32_t ide = omp_get_thread_num();
@@ -413,7 +393,7 @@ int main(int argc, char ** argv) {
         #pragma omp barrier
         _kernel_(ide, core_num);
     }
-    print_stats_fifos(NUM);
+    print_stats_fifos(NUM * 2);
 #endif
 return 0;
 }
